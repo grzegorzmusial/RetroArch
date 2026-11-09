@@ -24584,6 +24584,18 @@ MSG_HASH(
    "Scans a directory for content that matches the database."
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_VALUE_SCAN_CONSOLE_FOLDERS,
+   "Scan Console Folders"
+   )
+MSG_HASH(
+   MSG_SCAN_CONSOLE_FOLDERS_DONE,
+   "Console scan finished. Scanned: %u. Failed: %u."
+   )
+MSG_HASH(
+   MSG_SCAN_CONSOLE_FOLDERS_NONE,
+   "No supported console folders found."
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_VALUE_SCAN_THIS_DIRECTORY,
    "<Scan This Directory>"
    )

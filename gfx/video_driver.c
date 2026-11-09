@@ -7518,6 +7518,8 @@ void video_driver_build_info(video_frame_info_t *video_info)
          video_info->menu.flags |= VIDEO_MENU_FLAG_OZONE_SORT_AFTER_TRUNCATE_PLAYLIST_NAME;
       if (settings->bools.ozone_scroll_content_metadata)
          video_info->menu.flags |= VIDEO_MENU_FLAG_OZONE_SCROLL_CONTENT_METADATA;
+      if (settings->bools.ozone_console_carousel)
+         video_info->menu.flags |= VIDEO_MENU_FLAG_OZONE_CONSOLE_CAROUSEL;
       if (settings->bools.menu_show_sublabels_current_selection_only)
          video_info->menu.flags |= VIDEO_MENU_FLAG_SHOW_SUBLABELS_CURRENT_SELECTION_ONLY;
       if (settings->bools.menu_disable_search_button)

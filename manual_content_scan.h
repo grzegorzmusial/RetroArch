@@ -162,6 +162,7 @@ typedef struct
    char file_exts[PATH_MAX_LENGTH];
    char dat_file_path[PATH_MAX_LENGTH];
    bool core_set;
+   bool core_set_if_unset;
    bool file_exts_custom_set;
    bool search_recursively;
    bool search_archives;

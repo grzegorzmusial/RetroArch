@@ -11372,6 +11372,83 @@ static bool chain_saw(unsigned i, const char *name,
           && chain_added[i]    == added;
 }
 
+static void console_scan_done(const task_dbscan_chain_result_t *res,
+      void *user_data)
+{
+   chain_totals = *res;
+   chain_dones++;
+}
+
+static void console_folder_lane(const char *root, const char *pl_dir)
+{
+   static const struct
+   {
+      const char *path;
+      const char *data;
+   } files[] = {
+      { "snes/US/Homebrew.sfc", "homebrew" },
+      { "snes/US/Ignore.gba", "wrong system" },
+      { "psx/Disc 1.chd", "disc 1" },
+      { "psx/Disc 2.chd", "disc 2" },
+      { "psx/Two Discs.m3u", "Disc 1.chd\nDisc 2.chd\n" }
+   };
+   size_t i;
+   char content[512], pl[512], path[1024];
+   playlist_config_t config = {0};
+   playlist_t *playlist;
+
+   sprintf(content, "%s/console_folders", root);
+   sprintf(pl, "%s/console_playlists", root);
+   sprintf(path, "%s/snes/US", content);
+   path_mkdir(path);
+   sprintf(path, "%s/psx", content);
+   path_mkdir(path);
+   path_mkdir(pl);
+   for (i = 0; i < ARRAY_SIZE(files); i++)
+   {
+      sprintf(path, "%s/%s", content, files[i].path);
+      if (!filestream_write_file(path, files[i].data, strlen(files[i].data)))
+      {
+         check(0, "console folder fixture", path);
+         return;
+      }
+   }
+
+   delete_playlists(pl);
+   strlcpy(config_get_ptr()->paths.directory_playlist, pl,
+         sizeof(config_get_ptr()->paths.directory_playlist));
+   for (i = 0; i < 2; i++)
+   {
+      chain_dones = 0;
+      if (!task_push_console_folder_scan(content, console_scan_done))
+      {
+         check(0, "console folder scan starts", content);
+         break;
+      }
+      chain_wait(false);
+      check(chain_dones == 1 && chain_totals.ran == 2 && !chain_totals.failed,
+            "console scan skips missing folders", content);
+   }
+
+   config.capacity = 64;
+   sprintf(config.path, "%s/Nintendo - Super Nintendo Entertainment System.lpl", pl);
+   playlist = playlist_init(&config);
+   check(playlist_size(playlist) == 1 && file_contains(config.path, "Homebrew.sfc"),
+         "recursive console scan imports unmatched ROM once", config.path);
+   check(file_contains(config.path, "Console SNES Test"),
+         "sole installed core claiming the console is assigned", config.path);
+   playlist_free(playlist);
+
+   sprintf(config.path, "%s/Sony - PlayStation.lpl", pl);
+   playlist = playlist_init(&config);
+   check(playlist_size(playlist) == 1 && file_contains(config.path, "Two Discs.m3u"),
+         "M3U replaces its two disc entries and stays unique on rescan", config.path);
+   playlist_free(playlist);
+
+   strlcpy(config_get_ptr()->paths.directory_playlist, pl_dir,
+         sizeof(config_get_ptr()->paths.directory_playlist));
+}
+
 /* The chain runs --scan items in order, one task at a time: a missing
  * path and an unknown core fail their item, not the run, and the two
  * scans of one playlist follow each other, the second pushed from the
@@ -14834,6 +14911,19 @@ int main(int argc, char **argv)
    if (!write_lookup_cores(info_dir, core_dir))
    { check(0, "fixture", "could not write core info"); return 1; }
 
+   {
+      static const char snes_info[] =
+         "display_name = \"Console SNES Test\"\n"
+         "supported_extensions = \"sfc\"\n"
+         "database = \"Nintendo - Super Nintendo Entertainment System\"\n";
+      sprintf(p, "%s/console_snes_libretro.info", info_dir);
+      if (!filestream_write_file(p, snes_info, sizeof(snes_info) - 1))
+         return 1;
+      sprintf(p, "%s/console_snes_libretro.so", core_dir);
+      if (!filestream_write_file(p, "\177ELF", 4))
+         return 1;
+   }
+
 #ifdef HAVE_THREADS
    task_queue_init(true, msgq_push);
 #else
@@ -15651,6 +15741,7 @@ int main(int argc, char **argv)
    core_lookup_lane(root);
    chain_lane(root, pl_dir, crc_a, sz_a, false);
    chain_lane(root, pl_dir, crc_a, sz_a, true);
+   console_folder_lane(root, pl_dir);
    refresh_lane(root, pl_dir, crc_a, sz_a, false);
    refresh_lane(root, pl_dir, crc_a, sz_a, true);
    fs_main_lane(root, pl_dir);

@@ -31,6 +31,7 @@
 #include "../../config.def.h"
 #include "../../configuration.h"
 #include "../../driver.h"
+#include "../../runloop.h"
 #include "../../tasks/tasks_internal.h"
 #ifdef __MACH__
 #include <TargetConditionals.h>
@@ -75,6 +76,23 @@ int action_scan_file(const char *path,
 }
 #endif
 
+static void console_folder_scan_done(const task_dbscan_chain_result_t *res,
+      void *user_data)
+{
+   char msg[160];
+
+   handle_dbscan_finished(NULL, NULL, NULL, NULL);
+   if (res->cancelled)
+      return;
+   if (res->ran || res->failed)
+      snprintf(msg, sizeof(msg), msg_hash_to_str(MSG_SCAN_CONSOLE_FOLDERS_DONE),
+            res->ran, res->failed);
+   else
+      strlcpy(msg, msg_hash_to_str(MSG_SCAN_CONSOLE_FOLDERS_NONE), sizeof(msg));
+   runloop_msg_queue_push(msg, strlen(msg), 1, 180, true, NULL,
+         MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
+}
+
 int action_scan_directory(const char *path,
       const char *label, unsigned type, size_t idx)
 {
@@ -96,7 +114,18 @@ int action_scan_directory(const char *path,
    else
       strlcpy(fullpath, menu_path, sizeof(fullpath));
 
-   task_push_dbscan_known(fullpath, true, handle_dbscan_finished, NULL);
+   if (string_is_equal(label, MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS_STR))
+   {
+      if (!task_dbscan_chain_refuse_start()
+            && !task_push_console_folder_scan(fullpath, console_folder_scan_done))
+      {
+         const char *msg = msg_hash_to_str(MSG_MANUAL_CONTENT_SCAN_INVALID_CONFIG);
+         runloop_msg_queue_push(msg, strlen(msg), 1, 180, true, NULL,
+               MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_ERROR);
+      }
+   }
+   else
+      task_push_dbscan_known(fullpath, true, handle_dbscan_finished, NULL);
 
    return 0;
 }

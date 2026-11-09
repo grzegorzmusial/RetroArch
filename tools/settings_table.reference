@@ -198,6 +198,7 @@ bool	menu_pointer_enable	1	1
 bool	netplay_nat_traversal	1	1
 bool	ozone_show_sidebar	1	1
 bool	ozone_collapse_sidebar	1	0
+bool	ozone_console_carousel	1	0
 bool	video_hdr_scanlines	1	1
 bool	video_stereo_swap_eyes	1	0
 bool	video_windows_enable	1	1
@@ -934,6 +935,7 @@ bool	menu_pointer_enable	1	0
 bool	netplay_nat_traversal	1	1
 bool	ozone_show_sidebar	1	1
 bool	ozone_collapse_sidebar	1	0
+bool	ozone_console_carousel	1	0
 bool	video_hdr_scanlines	1	1
 bool	video_stereo_swap_eyes	1	0
 bool	video_openxr_enable	1	0
@@ -1667,6 +1669,7 @@ bool	menu_pointer_enable	1	0
 bool	netplay_nat_traversal	1	1
 bool	ozone_show_sidebar	1	1
 bool	ozone_collapse_sidebar	1	0
+bool	ozone_console_carousel	1	0
 bool	video_hdr_scanlines	1	1
 bool	video_stereo_swap_eyes	1	0
 bool	video_openxr_enable	1	0

@@ -377,7 +377,8 @@ enum task_dbscan_item_kind
 {
    TASK_DBSCAN_ITEM_PATH = 0,     /* --scan */
    TASK_DBSCAN_ITEM_REFRESH,      /* --scan-refresh */
-   TASK_DBSCAN_ITEM_REFRESH_ALL   /* --scan-refresh-all, Refresh All */
+   TASK_DBSCAN_ITEM_REFRESH_ALL,  /* --scan-refresh-all, Refresh All */
+   TASK_DBSCAN_ITEM_CONSOLE_DIR
 };
 
 typedef struct
@@ -420,6 +421,11 @@ typedef void (*task_dbscan_chain_cb_t)(
 bool task_push_dbscan_chain(task_dbscan_item_t *items, size_t count,
       task_dbscan_item_cb_t item_cb, task_dbscan_chain_cb_t done_cb,
       void *user_data);
+
+#ifdef HAVE_LIBRETRODB
+bool task_push_console_folder_scan(const char *root,
+      task_dbscan_chain_cb_t done_cb);
+#endif
 
 /* Main thread only. */
 bool task_dbscan_chain_is_running(void);

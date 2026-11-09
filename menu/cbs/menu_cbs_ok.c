@@ -7758,6 +7758,16 @@ static int action_ok_scan_directory_list(const char *path,
          ACTION_OK_DL_SCAN_DIR_LIST);
 }
 
+#ifdef HAVE_LIBRETRODB
+static int action_ok_scan_console_folders(const char *path,
+      const char *label, unsigned type, size_t idx, size_t entry_idx)
+{
+   if (type == FILE_TYPE_SCAN_DIRECTORY)
+      return action_scan_directory(NULL, label, type, idx);
+   return action_ok_scan_directory_list(path, label, type, idx, entry_idx);
+}
+#endif
+
 static int action_ok_push_random_dir(const char *path,
       const char *label, unsigned type, size_t idx, size_t entry_idx)
 {
@@ -10285,6 +10295,9 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_CONTENT_SETTINGS,                    action_ok_push_default},
          {MENU_ENUM_LABEL_LOAD_CONTENT_SPECIAL,                action_ok_push_filebrowser_list_file_select},
          {MENU_ENUM_LABEL_SCAN_DIRECTORY,                      action_ok_scan_directory_list},
+#ifdef HAVE_LIBRETRODB
+         {MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS,                action_ok_scan_console_folders},
+#endif
          {MENU_ENUM_LABEL_SCAN_FILE,                           action_ok_push_scan_file},
          {MENU_ENUM_LABEL_FAVORITES,                           action_ok_push_content_list},
          {MENU_ENUM_LABEL_FILE_DETECT_CORE_LIST_PUSH_DIR,      action_ok_push_random_dir},

@@ -1794,11 +1794,12 @@ void gfx_thumbnail_request(
             {
                enum playlist_thumbnail_name_flags curr_flag;
                static char last_img_name[PATH_MAX_LENGTH] = {0};
+               static char last_system[NAME_MAX_LENGTH]    = {0};
                bool playlist_use_filename                 = config_get_ptr()->bools.playlist_use_filename;
-               if (!playlist)
+               if (!playlist || !*path_data->system)
                   goto end;
                /* Only trigger a thumbnail download if image
-                * name has changed since the last call of
+                * name or system has changed since the last call of
                 * gfx_thumbnail_request()
                 * > Allows gfx_thumbnail_request() to be used
                 *   for successive right/left thumbnail requests
@@ -1810,14 +1811,12 @@ void gfx_thumbnail_request(
                 *   overheads. We can avoid this entirely with
                 *   a simple string comparison) */
                if (*path_data->content_img)
-                  if (string_is_equal(path_data->content_img, last_img_name))
+                  if (   string_is_equal(path_data->content_img, last_img_name)
+                      && string_is_equal(path_data->system, last_system))
                      goto end;
 
                strlcpy(last_img_name, path_data->content_img, sizeof(last_img_name));
-
-               /* Get system name */
-               if (!*path_data->system)
-                  goto end;
+               strlcpy(last_system, path_data->system, sizeof(last_system));
 
                /* Since task_push_pl_entry_download will shift the flag, do not attempt if it is already
                 * at second to last option. */

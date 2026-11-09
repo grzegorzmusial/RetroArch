@@ -35,6 +35,12 @@ android {
     resValues true
   }
 
+  if (project.hasProperty("bundleConsoleAssets")) {
+    androidResources {
+      noCompress += ["ttf", "cfg", "bin", "md", "txt"]
+    }
+  }
+
   ndkVersion "29.0.14206865"
 
   flavorDimensions "variant"

@@ -5197,6 +5197,34 @@ static void ozone_sidebar_goto(ozone_handle_t *ozone, size_t new_selection)
       ozone_change_tab(ozone, ozone_system_tabs_idx[ozone->tabs[new_selection]], ozone_system_tabs_type[ozone->tabs[new_selection]]);
 }
 
+static bool ozone_console_carousel_active(const ozone_handle_t *ozone)
+{
+   return ozone->show_playlist_tabs
+       && ozone->depth == 1
+       && ozone->horizontal_list.size > 1
+       && ozone->categories_selection_ptr > ozone->system_tab_end
+       && ozone->categories_selection_ptr - ozone->system_tab_end
+            <= ozone->horizontal_list.size
+       && !(ozone->flags2 & (OZONE_FLAG2_SHOW_FULLSCREEN_THUMBNAILS
+                            | OZONE_FLAG2_WANT_FULLSCREEN_THUMBNAILS));
+}
+
+static size_t ozone_console_carousel_neighbour(const ozone_handle_t *ozone,
+      bool next)
+{
+   size_t count = ozone->horizontal_list.size;
+   size_t index = ozone->categories_selection_ptr - ozone->system_tab_end - 1;
+
+   return (index + (next ? 1 : count - 1)) % count;
+}
+
+static void ozone_console_carousel_move(ozone_handle_t *ozone, bool next)
+{
+   ozone->flags &= ~OZONE_FLAG_CURSOR_MODE;
+   ozone_sidebar_goto(ozone, ozone->system_tab_end + 1
+         + ozone_console_carousel_neighbour(ozone, next));
+}
+
 static void ozone_sidebar_entries_build_scroll_indices(ozone_handle_t *ozone)
 {
    size_t i                     = 0;
@@ -9234,6 +9262,13 @@ static enum menu_action ozone_parse_menu_entry_action(
    is_current_entry_settings = ozone_is_current_entry_settings(selection);
 
    /* Scan user inputs */
+   if (   settings->bools.ozone_console_carousel
+       && (action == MENU_ACTION_SCROLL_UP || action == MENU_ACTION_SCROLL_DOWN)
+       && ozone_console_carousel_active(ozone))
+   {
+      ozone_console_carousel_move(ozone, action == MENU_ACTION_SCROLL_DOWN);
+      return MENU_ACTION_ACCESSIBILITY_SPEAK_TITLE;
+   }
    switch (action)
    {
       case MENU_ACTION_START:
@@ -11818,6 +11853,48 @@ static void ozone_render(void *data,
    gfx_thumbnail_flush_requests();
 }
 
+static void ozone_draw_console_carousel(ozone_handle_t *ozone,
+      unsigned video_dims)
+{
+   size_t i;
+   unsigned offset;
+   unsigned width = VIDEO_SCALE_W(video_dims);
+   unsigned slot_width = width / 3;
+   size_t indices[3];
+   char label[NAME_MAX_LENGTH];
+   char clipped[NAME_MAX_LENGTH];
+   gfx_animation_ctx_ticker_smooth_t ticker = {0};
+
+   indices[0] = ozone_console_carousel_neighbour(ozone, false);
+   indices[1] = ozone->categories_selection_ptr - ozone->system_tab_end - 1;
+   indices[2] = ozone_console_carousel_neighbour(ozone, true);
+   ticker.dst_str     = clipped;
+   ticker.dst_str_len = sizeof(clipped);
+   ticker.x_offset    = &offset;
+   ticker.font        = ozone->fonts.title.font;
+   ticker.field_width = slot_width * 9 / 10;
+
+   for (i = 0; i < ARRAY_SIZE(indices); i++)
+   {
+      const char *name = ozone->horizontal_list.list[indices[i]].alt;
+      if (!name)
+         name = path_basename(ozone->horizontal_list.list[indices[i]].path);
+      if (!name)
+         name = "";
+      snprintf(label, sizeof(label), "%s%s%s",
+            i == 0 ? "<  " : "", name, i == 2 ? "  >" : "");
+      ticker.src_str    = label;
+      ticker.font_scale = i == 1 ? 1.0f : 0.8f;
+      clipped[0]        = '\0';
+      gfx_animation_ticker_smooth(&ticker);
+      gfx_display_draw_text(ozone->fonts.title.font, clipped,
+            (i + 0.5f) * slot_width,
+            ozone->dimensions.header_height / 2 + ozone->fonts.title.line_centre_offset,
+            video_dims, ozone->theme->text_rgba, TEXT_ALIGN_CENTER,
+            ticker.font_scale, false, i == 1 ? 1.0f : 0.75f, false);
+   }
+}
+
 OZONE_NOINLINE static void ozone_draw_header(
       ozone_handle_t *ozone,
       const uintptr_t *icons_tex,
@@ -11904,6 +11981,13 @@ OZONE_NOINLINE static void ozone_draw_header(
             video_dims,
             ozone->theme->header_footer_separator,
             NULL);
+
+   if (   (video_info->menu.flags & VIDEO_MENU_FLAG_OZONE_CONSOLE_CAROUSEL)
+       && ozone_console_carousel_active(ozone))
+   {
+      ozone_draw_console_carousel(ozone, video_dims);
+      return;
+   }
 
    /* Icon */
    if (dispctx && logo_icon_size)
@@ -14455,7 +14539,16 @@ static int ozone_pointer_up(void *userdata,
       case MENU_INPUT_GESTURE_SHORT_PRESS:
          /* Tap/press header or footer: Menu back/cancel */
          if ((int)y < ozone->dimensions.header_height)
+         {
+            if (   settings->bools.ozone_console_carousel
+                && (x < width / 3 || x >= width * 2 / 3)
+                && ozone_console_carousel_active(ozone))
+            {
+               ozone_console_carousel_move(ozone, x >= width * 2 / 3);
+               return 0;
+            }
             return ozone_menu_entry_action(ozone, entry, selection, MENU_ACTION_CANCEL);
+         }
          else if ((int)y > (int)height - ozone->dimensions.footer_height)
             return ozone_tap_footer(ozone, x, width, entry);
          /* Tap/press entries: Activate and/or select item */
