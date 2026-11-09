@@ -965,7 +965,9 @@ bool task_push_pl_entry_thumbnail_download(
    next_flag = playlist_get_next_thumbnail_name_flag(playlist,idx);
    playlist_update_thumbnail_name_flag(playlist, idx, next_flag);
    /* Skip over full name if not enabled. */
-   if (next_flag == PLAYLIST_THUMBNAIL_FLAG_FULL_NAME && !settings->bools.playlist_use_filename)
+   if (   next_flag == PLAYLIST_THUMBNAIL_FLAG_FULL_NAME
+       && !settings->bools.playlist_use_filename
+       && !playlist_thumbnail_match_with_filename(playlist))
    {
       next_flag = playlist_get_next_thumbnail_name_flag(playlist,idx);
       playlist_update_thumbnail_name_flag(playlist, idx, next_flag);

@@ -40,5 +40,10 @@ S_BOOL(ozone_collapse_sidebar, OZONE_COLLAPSE_SIDEBAR,
       DEFAULT_OZONE_COLLAPSE_SIDEBAR, SD_FLAG_NONE, 0, 0,
       "Collapse the Sidebar",
       "Have the left sidebar always collapsed.")
+S_BOOL(ozone_console_carousel, OZONE_CONSOLE_CAROUSEL,
+      "ozone_console_carousel",
+      DEFAULT_OZONE_CONSOLE_CAROUSEL, SD_FLAG_NONE, 0, 0,
+      "Console Carousel",
+      "Show neighbouring console playlists above the game list. Switch with L/R or tap the sides of the header.")
 #endif
 #endif

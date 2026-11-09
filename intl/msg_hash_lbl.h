@@ -2480,6 +2480,10 @@ MSG_HASH(
    "network_remote_users"
    )
 MSG_HASH(
+   MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS,
+   "scan_console_folders"
+   )
+MSG_HASH(
    MENU_ENUM_LABEL_SCAN_THIS_DIRECTORY,
    "scan_this_directory"
    )

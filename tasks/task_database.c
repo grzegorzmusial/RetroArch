@@ -4683,7 +4683,12 @@ static bool manual_scan_end_flush_tick(
          /* Set default core, if required.
           * A file is only added: the playlist keeps its own. */
          if (    manual_scan->task_config->core_set
-             && !manual_scan->task_config->content_is_file)
+             && !manual_scan->task_config->content_is_file
+             && (!manual_scan->task_config->core_set_if_unset
+                || string_is_equal(playlist_get_default_core_path(
+                     manual_scan->flush_playlist), FILE_PATH_DETECT)
+                || string_is_empty(playlist_get_default_core_path(
+                     manual_scan->flush_playlist))))
          {
             playlist_set_default_core_path(manual_scan->flush_playlist,
                   manual_scan->task_config->core_path);
@@ -5810,7 +5815,11 @@ static void manual_scan_playlist_setup(
    /* Set default core, if required.
     * A file is only added: the playlist keeps its own. */
    if (    manual_scan->task_config->core_set
-       && !manual_scan->task_config->content_is_file)
+       && !manual_scan->task_config->content_is_file
+       && (!manual_scan->task_config->core_set_if_unset
+          || string_is_equal(playlist_get_default_core_path(playlist),
+               FILE_PATH_DETECT)
+          || string_is_empty(playlist_get_default_core_path(playlist))))
    {
       playlist_set_default_core_path(playlist,
             manual_scan->task_config->core_path);
@@ -6779,6 +6788,7 @@ static bool task_manual_content_scan_finder(retro_task_t *task, void *user_data)
 static bool task_manual_content_scan_push(
       bool do_menu_refresh, const char *cli_name,
       const struct string_list *group,
+      bool core_set_if_unset,
       retro_task_callback_t user_cb, void *user_data)
 {
    size_t _len;
@@ -6851,6 +6861,8 @@ static bool task_manual_content_scan_push(
             MESSAGE_QUEUE_ICON_DEFAULT, MESSAGE_QUEUE_CATEGORY_INFO);
       goto error;
    }
+
+   manual_scan->task_config->core_set_if_unset = core_set_if_unset;
 
    if (group)
    {
@@ -6964,7 +6976,7 @@ bool task_push_manual_content_scan(
       bool do_menu_refresh,
       retro_task_callback_t user_cb, void *user_data)
 {
-   return task_manual_content_scan_push(do_menu_refresh, NULL, NULL,
+   return task_manual_content_scan_push(do_menu_refresh, NULL, NULL, false,
          user_cb, user_data);
 }
 
@@ -6974,7 +6986,7 @@ bool task_push_manual_content_scan_group(const struct string_list *group,
 {
    if (!group || !group->size)
       return false;
-   return task_manual_content_scan_push(false, cli_name, group,
+   return task_manual_content_scan_push(false, cli_name, group, false,
          user_cb, user_data);
 }
 #endif
@@ -7402,12 +7414,64 @@ static void dbscan_chain_single_warn(const dbscan_chain_t *chain,
 
 /* True once the item's scan is pushed, @prep's path and what the file
  * system said of it in hand; otherwise it is folded as failed. */
+#ifdef HAVE_LIBRETRODB
+static void dbscan_console_settings(manual_content_scan_overrides_t *ov,
+      const struct string_list *databases)
+{
+   size_t i;
+   char rdb_name[NAME_MAX_LENGTH];
+   core_info_list_t *cores = NULL;
+   const core_info_t *candidate = NULL;
+
+   ov->match = MANUAL_CONTENT_SCAN_USE_DB_NONE;
+   snprintf(rdb_name, sizeof(rdb_name), "%s.rdb", ov->playlist);
+   if (databases)
+      for (i = 0; i < databases->size; i++)
+         if (string_is_equal(path_basename(databases->elems[i].data), rdb_name))
+         {
+            ov->database = ov->playlist;
+            ov->match = MANUAL_CONTENT_SCAN_USE_DB_LOOSE;
+            break;
+         }
+   if (!core_info_get_list(&cores) || !cores)
+      return;
+   for (i = 0; i < cores->count; i++)
+   {
+      const core_info_t *core = &cores->list[i];
+      if (   !(core->flags & CORE_INFO_FLAG_IS_INSTALLED)
+          || string_is_empty(core->display_name)
+          || !core->databases_list
+          || !string_list_find_elem(core->databases_list, ov->playlist))
+         continue;
+      if (candidate)
+         return;
+      candidate = core;
+   }
+   if (   candidate
+       && !manual_content_scan_set_menu_core_name(MANUAL_CONTENT_SCAN_CORE_SET,
+               candidate->display_name))
+      manual_content_scan_set_menu_core_name(MANUAL_CONTENT_SCAN_CORE_DETECT, NULL);
+}
+#endif
+
 static bool dbscan_chain_push_scan(dbscan_chain_t *chain,
       const task_dbscan_item_t *item, dbscan_prep_t *prep)
 {
    enum manual_content_scan_override_status st;
+   const manual_content_scan_overrides_t *overrides = item->overrides;
+#ifdef HAVE_LIBRETRODB
+   manual_content_scan_overrides_t console_overrides;
+#endif
    unsigned count = 0;
    char *path     = prep->path;
+   bool console_dir = item->kind == TASK_DBSCAN_ITEM_CONSOLE_DIR;
+
+   if (   console_dir && !prep->failed
+       && (!path || !(prep->fs->content_stat & RETRO_VFS_STAT_IS_DIRECTORY)))
+   {
+      dbscan_chain_fold(chain, item->arg, TASK_DBSCAN_SKIPPED, NULL);
+      return false;
+   }
 
    if (!path)
    {
@@ -7432,7 +7496,15 @@ static bool dbscan_chain_push_scan(dbscan_chain_t *chain,
    prep->path = NULL;
    manual_content_scan_reset_settings();
    manual_content_scan_set_menu_content_dir_fs(path, prep->fs);
-   if ((st = manual_content_scan_apply_overrides_fs(item->overrides,
+#ifdef HAVE_LIBRETRODB
+   if (console_dir)
+   {
+      console_overrides = *overrides;
+      dbscan_console_settings(&console_overrides, chain->rdb_list);
+      overrides = &console_overrides;
+   }
+#endif
+   if ((st = manual_content_scan_apply_overrides_fs(overrides,
          chain->rdb_list, &count, prep->fs)) != MANUAL_CONTENT_SCAN_OVR_OK)
       dbscan_chain_override_error(chain, item->arg, item->overrides, st,
             count);
@@ -7449,7 +7521,8 @@ static bool dbscan_chain_push_scan(dbscan_chain_t *chain,
          flags &= ~(unsigned)MANUAL_CONTENT_SCAN_OVR_OVERWRITE;
       }
       dbscan_chain_single_warn(chain, path, flags);
-      if (task_push_manual_content_scan(false, dbscan_chain_scan_cb, chain))
+      if (task_manual_content_scan_push(false, NULL, NULL, console_dir,
+               dbscan_chain_scan_cb, chain))
       {
          chain->name = path;
          return true;
@@ -7520,7 +7593,7 @@ static bool dbscan_chain_push_refreshed(dbscan_chain_t *chain,
       {
          dbscan_chain_single_warn(chain, *name,
                item->overrides ? item->overrides->flags : 0);
-         if (task_manual_content_scan_push(false, *name, chain->group,
+         if (task_manual_content_scan_push(false, *name, chain->group, false,
                dbscan_chain_scan_cb, chain))
          {
             chain->name = *name;
@@ -8550,6 +8623,7 @@ static void dbscan_chain_next(dbscan_chain_t *chain)
       switch (item->kind)
       {
          case TASK_DBSCAN_ITEM_PATH:
+         case TASK_DBSCAN_ITEM_CONSOLE_DIR:
             if (dbscan_chain_push_path(chain, item))
                return;
             break;
@@ -8660,3 +8734,68 @@ bool task_dbscan_chain_is_running(void)
 {
    return dbscan_chain_running != NULL;
 }
+
+#ifdef HAVE_LIBRETRODB
+bool task_push_console_folder_scan(const char *root,
+      task_dbscan_chain_cb_t done_cb)
+{
+   static const struct
+   {
+      const char *folder;
+      const char *playlist;
+      const char *extensions;
+   } systems[] = {
+      { "nes",     "Nintendo - Nintendo Entertainment System", "nes fds unf unif" },
+      { "snes",    "Nintendo - Super Nintendo Entertainment System", "sfc smc fig swc" },
+      { "gb",      "Nintendo - Game Boy", "gb dmg" },
+      { "gbc",     "Nintendo - Game Boy Color", "gbc" },
+      { "gba",     "Nintendo - Game Boy Advance", "gba agb" },
+      { "n64",     "Nintendo - Nintendo 64", "n64 v64 z64" },
+      { "nds",     "Nintendo - Nintendo DS", "nds dsi" },
+      { "mastersystem", "Sega - Master System - Mark III", "sms" },
+      { "gamegear", "Sega - Game Gear", "gg" },
+      { "megadrive", "Sega - Mega Drive - Genesis", "md gen smd bin" },
+      { "sega32x", "Sega - 32X", "32x bin" },
+      { "segacd",  "Sega - Mega-CD - Sega CD", "cue chd m3u" },
+      { "saturn",  "Sega - Saturn", "cue chd m3u ccd" },
+      { "dreamcast", "Sega - Dreamcast", "gdi cdi chd cue m3u" },
+      { "psx",     "Sony - PlayStation", "cue chd m3u ccd pbp" },
+      { "psp",     "Sony - PlayStation Portable", "iso cso pbp" },
+      { "pcengine", "NEC - PC Engine - TurboGrafx 16", "pce sgx" },
+      { "pcenginecd", "NEC - PC Engine CD - TurboGrafx-CD", "cue chd m3u" }
+   };
+   size_t i;
+   size_t root_len;
+   task_dbscan_item_t *items;
+
+   if (string_is_empty(root) || !task_dbscan_chain_can_start())
+      return false;
+   root_len = strlen(root);
+   if (!(items = (task_dbscan_item_t*)calloc(ARRAY_SIZE(systems), sizeof(*items))))
+      return false;
+
+   for (i = 0; i < ARRAY_SIZE(systems); i++)
+   {
+      size_t path_size = root_len + strlen(systems[i].folder) + 2;
+      manual_content_scan_overrides_t *ov =
+            (manual_content_scan_overrides_t*)calloc(1, sizeof(*ov));
+
+      items[i].overrides = ov;
+      items[i].kind      = TASK_DBSCAN_ITEM_CONSOLE_DIR;
+      if (   !ov
+          || path_size > PATH_MAX_LENGTH
+          || !(items[i].arg = (char*)malloc(path_size))
+          || !(ov->playlist = strdup(systems[i].playlist))
+          || !(ov->exts = strdup(systems[i].extensions))
+          || fill_pathname_join_special(items[i].arg, root,
+               systems[i].folder, path_size) >= path_size)
+      {
+         dbscan_chain_free_items(items, i + 1);
+         return false;
+      }
+      ov->flags = MANUAL_CONTENT_SCAN_OVR_MATCH;
+   }
+
+   return task_push_dbscan_chain(items, ARRAY_SIZE(systems), NULL, done_cb, NULL);
+}
+#endif

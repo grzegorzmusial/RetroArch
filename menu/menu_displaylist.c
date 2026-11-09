@@ -717,6 +717,11 @@ static int filebrowser_parse(
       case FILEBROWSER_SCAN_DIR:
 #ifdef HAVE_LIBRETRODB
          menu_entries_prepend(info_list,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SCAN_CONSOLE_FOLDERS),
+               MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS_STR,
+               MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS,
+               FILE_TYPE_SCAN_DIRECTORY, 0, 0);
+         menu_entries_prepend(info_list,
                msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SCAN_THIS_DIRECTORY),
                MENU_ENUM_LABEL_SCAN_THIS_DIRECTORY_STR,
                MENU_ENUM_LABEL_SCAN_THIS_DIRECTORY,
@@ -10309,6 +10314,14 @@ unsigned menu_displaylist_build_list(
 #endif
          break;
       case DISPLAYLIST_SCAN_DIRECTORY_LIST:
+#ifdef HAVE_LIBRETRODB
+         if (menu_entries_append(list,
+                  msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SCAN_CONSOLE_FOLDERS),
+                  MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS_STR,
+                  MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS,
+                  MENU_SETTING_ACTION, 0, 0, NULL))
+            count++;
+#endif
 #if 0
          if (menu_entries_append(list,
                   msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SCAN_DIRECTORY),
@@ -11016,6 +11029,12 @@ unsigned menu_displaylist_build_list(
          break;
       case DISPLAYLIST_ADD_CONTENT_LIST:
 #ifdef HAVE_LIBRETRODB
+         if (menu_entries_append(list,
+                  msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SCAN_CONSOLE_FOLDERS),
+                  MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS_STR,
+                  MENU_ENUM_LABEL_SCAN_CONSOLE_FOLDERS,
+                  MENU_SETTING_ACTION, 0, 0, NULL))
+            count++;
          if (menu_entries_append(list,
                   msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SCAN_DIRECTORY),
                   MENU_ENUM_LABEL_SCAN_DIRECTORY_STR,
@@ -15166,6 +15185,7 @@ unsigned menu_displaylist_build_list(
                {MENU_ENUM_LABEL_OZONE_HEADER_SEPARATOR,                       PARSE_ONLY_UINT,   true},
                {MENU_ENUM_LABEL_OZONE_SHOW_SIDEBAR,                           PARSE_ONLY_BOOL,   true},
                {MENU_ENUM_LABEL_OZONE_COLLAPSE_SIDEBAR,                       PARSE_ONLY_BOOL,   true},
+               {MENU_ENUM_LABEL_OZONE_CONSOLE_CAROUSEL,                       PARSE_ONLY_BOOL,   true},
                {MENU_ENUM_LABEL_MATERIALUI_LANDSCAPE_LAYOUT_OPTIMIZATION,     PARSE_ONLY_UINT,   true},
                {MENU_ENUM_LABEL_MATERIALUI_SHOW_NAV_BAR,                      PARSE_ONLY_BOOL,   true},
                {MENU_ENUM_LABEL_MATERIALUI_AUTO_ROTATE_NAV_BAR,               PARSE_ONLY_BOOL,   false},
